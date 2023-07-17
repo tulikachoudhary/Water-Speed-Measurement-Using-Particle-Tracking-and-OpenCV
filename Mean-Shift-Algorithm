@@ -1,0 +1,112 @@
+import cv2
+import time
+
+
+
+
+# Create tracker object
+tracker = cv2.TrackerMIL_create()
+
+
+
+
+# Open video file
+video_file = "FloatBall1.mp4"
+cap = cv2.VideoCapture(video_file)
+
+
+
+
+# Select initial bounding box
+while True:
+  # Capture first frame
+  ret, frame = cap.read()
+  if not ret:
+      print("Failed to read video")
+      break
+
+
+
+
+  # Select ROI
+  bbox = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
+  print("Selected bounding box:", bbox)
+
+
+
+
+  # Initialize tracker
+  ret = tracker.init(frame, bbox)
+  if not ret:
+      print("Failed to initialize tracker")
+      break
+
+
+
+
+  # Exit ROI selection loop
+  break
+
+
+
+
+# Process video frames
+prev_time = time.time()
+prev_position = None
+prev_speed = None
+while True:
+  # Read next frame
+  ret, frame = cap.read()
+  if not ret:
+      print("End of video")
+      break
+
+
+
+
+  # Update tracker
+  ret, bbox = tracker.update(frame)
+  if not ret:
+      print("Failed to update tracker")
+      break
+
+
+
+
+  # Draw bounding box on frame
+  bbox = tuple(map(int, bbox))
+  cv2.rectangle(frame, bbox[0:2], (bbox[0]+bbox[2], bbox[1]+bbox[3]), (0, 255, 0), 2)
+
+
+
+
+  # Calculate speed
+  current_position = bbox[0] + bbox[2] / 2
+  if prev_position is not None:
+      displacement = abs(current_position - prev_position)
+      elapsed_time = time.time() - prev_time
+      if elapsed_time > 0:
+          speed = displacement / elapsed_time
+          prev_speed = speed
+  prev_position = current_position
+  prev_time = time.time()
+
+
+
+
+  # Display frame and speed
+  if prev_speed is not None:
+      speed_text = f"Speed: {prev_speed:.2f} pixels/sec"
+      cv2.putText(frame, speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+  cv2.imshow("Frame", frame)
+  if cv2.waitKey(1) == ord('q'):
+      break
+
+
+
+
+# Release resources
+cap.release()
+cv2.destroyAllWindows()
+
+
