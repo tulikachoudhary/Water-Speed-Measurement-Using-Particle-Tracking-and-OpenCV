@@ -1,0 +1,100 @@
+import cv2
+import numpy as np
+
+
+# Create tracker object
+tracker = cv2.TrackerMIL_create()
+
+
+# Open video file
+video_file = "FloatBall1.mp4"
+cap = cv2.VideoCapture(video_file)
+
+
+# Select initial bounding box
+while True:
+    # Capture first frame
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to read video")
+        break
+
+    # Select ROI
+    bbox = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
+    print("Selected bounding box:", bbox)
+
+    # Initialize tracker
+    ret = tracker.init(frame, bbox)
+    if not ret:
+        print("Failed to initialize tracker")
+        break
+
+    # Exit ROI selection loop
+    break
+
+
+# Define parameters for Lucas-Kanade optical flow
+lk_params = dict(winSize=(15, 15), maxLevel=4, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+
+# Initialize previous points variable
+prev_points = None
+
+
+# Process video frames
+while True:
+    # Read next frame
+    ret, frame = cap.read()
+    if not ret:
+        print("End of video")
+        break
+
+    # Convert frame to grayscale
+    current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # If previous points exist, track the object using Lucas-Kanade optical flow
+    if prev_points is not None:
+        # Calculate optical flow between previous and current frames
+        next_points, status, error = cv2.calcOpticalFlowPyrLK(prev_frame, current_frame, prev_points, None, **lk_params)
+
+        # Select good points
+        good_new = next_points[status == 1]
+        good_prev = prev_points[status == 1]
+
+        # Calculate average speed
+        if len(good_new) > 0:
+            speed = np.mean(np.linalg.norm(good_new - good_prev, axis=1))
+            print("Speed :",speed)
+
+        # Update previous points variable
+        prev_points = good_new.reshape(-1, 1, 2)
+
+    # Update tracker
+    ret, bbox = tracker.update(frame)
+    if not ret:
+        print("Failed to update tracker")
+        break
+
+    # Draw bounding box on frame
+    bbox = tuple(map(int, bbox))
+    cv2.rectangle(frame, bbox[0:2], (bbox[0]+bbox[2], bbox[1]+bbox[3]), (0, 255, 0), 2)
+
+    # Display frame
+    cv2.imshow("Frame", frame)
+
+    # Update previous frame and points variables
+    prev_frame = current_frame.copy()
+    if prev_points is None:
+        prev_points = cv2.goodFeaturesToTrack(prev_frame, maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7)
+
+    # Exit loop if 'q' key is pressed
+    if cv2.waitKey(1) == ord('q'):
+        break
+
+
+# Release resources
+cap.release()
+cv2.destroyAllWindows()
+
+
+
